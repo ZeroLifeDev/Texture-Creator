@@ -20,7 +20,7 @@ public readonly record struct MeshVertex(int Position, int TexCoord, int Normal)
 
 public enum ReferenceRole { Custom, Front, Back, Left, Right, Top, Bottom }
 public enum MaterialKind { Dielectric, Fabric, Leather, Plastic, Rubber, Wood, Stone, PaintedMetal, BareMetal, Skin, Glass, Custom }
-public enum MapKind { Albedo, Roughness, Normal, Height, Metalness, AmbientOcclusion, Coverage }
+public enum MapKind { Diffuse, Albedo, Roughness, Normal, Height, Metalness, AmbientOcclusion, Coverage }
 
 public sealed class ReferenceImage
 {
@@ -77,4 +77,3 @@ public sealed class TextureSet
 }
 
 public readonly record struct SeamPair(Vector2 A0, Vector2 A1, Vector2 B0, Vector2 B1);
-

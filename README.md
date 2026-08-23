@@ -6,9 +6,12 @@ PBR Reference Forge is a native Windows desktop application that helps artists t
 
 ![PBR Reference Forge main workspace](docs/screenshots/main-workspace.png)
 
-## What works in v0.1.0-alpha
+## What works in v0.2.0-alpha
 
 - Native dark Windows workspace with 3D orbit/zoom preview and UV inspection
+- Default three-step Quick Texture Export: choose a UV model, choose a reference, generate a ZIP
+- Quick ZIP contains exactly Diffuse, Albedo, Roughness, Normal, Displacement and Metalness PNG maps
+- The full multi-reference inspection workflow remains available under **Advanced Workspace**
 - OBJ, GLB and GLTF import with explicit missing-UV validation
 - PNG, JPEG and system-codec WebP reference loading
 - Multiple reference assets with Front/Back/Left/Right/Top/Bottom roles, overlay inspection and saved camera-alignment data model
@@ -23,16 +26,15 @@ PBR Reference Forge is a native Windows desktop application that helps artists t
 
 ## Install
 
-Download `PBR-Reference-Forge-v0.1.0-alpha-win-x64.zip` from Releases, extract it to a writable folder, and run `PBRReferenceForge.exe`. Windows 10 22H2 or Windows 11 x64 is recommended. The build is self-contained; no separate .NET install is required. If SmartScreen appears for the unsigned alpha, verify the download came from this repository, choose **More info**, then **Run anyway**.
+Download either the standalone `PBR-Reference-Forge-v0.2.0-alpha-win-x64.exe` or the portable ZIP from Releases. Windows 10 22H2 or Windows 11 x64 is recommended. The build is self-contained; no separate .NET install is required. If SmartScreen appears for the unsigned alpha, verify the download came from this repository, choose **More info**, then **Run anyway**.
 
 ## Workflow
 
-1. Import an OBJ, GLB or GLTF model. Generation is blocked if the mesh lacks UVs.
-2. Add one or more PNG/JPEG/WebP references and inspect them behind the model.
-3. Inspect UV coverage and seam count.
-4. Choose material class, output resolution and PBR strengths.
-5. Generate locally, inspect individual maps, then export the set.
-6. Optionally invoke Web Assist. The app discloses external processing, prepares controlled images/masks, and opens the normal ChatGPT site; you remain in control of authentication and uploads.
+1. Choose an OBJ, GLB or GLTF model. Generation is blocked if the mesh lacks UVs.
+2. Choose a PNG/JPEG/WebP texture reference.
+3. Select resolution and material, then click **Generate PBR ZIP**.
+4. Receive Diffuse, Albedo, Roughness, Normal, Displacement and Metalness maps in one ZIP.
+5. Use **Advanced Workspace** for multiple views, UV inspection, project files, map soloing and Web Assist.
 
 ## Privacy and hardware
 

@@ -21,9 +21,14 @@ public static class ImageIo
     public static void SavePng(ImageBuffer image, string path)
     {
         Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(path))!);
+        File.WriteAllBytes(path, EncodePng(image));
+    }
+
+    public static byte[] EncodePng(ImageBuffer image)
+    {
         var bgra = (byte[])image.Pixels.Clone(); for (var i = 0; i < bgra.Length; i += 4) (bgra[i], bgra[i + 2]) = (bgra[i + 2], bgra[i]);
         var bmp = BitmapSource.Create(image.Width, image.Height, 96, 96, PixelFormats.Bgra32, null, bgra, image.Width * 4);
-        var encoder = new PngBitmapEncoder(); encoder.Frames.Add(BitmapFrame.Create(bmp)); using var stream = File.Create(path); encoder.Save(stream);
+        var encoder = new PngBitmapEncoder(); encoder.Frames.Add(BitmapFrame.Create(bmp)); using var stream = new MemoryStream(); encoder.Save(stream); return stream.ToArray();
     }
 
     public static BitmapSource ToBitmap(ImageBuffer image)
@@ -40,6 +45,7 @@ public sealed class PbrGenerator
         var set = new TextureSet(); var albedo = CorrectAlbedo(source, ct); progress?.Report(.2);
         var height = Luminance(albedo); progress?.Report(.35); ct.ThrowIfCancellationRequested();
         set.Maps[MapKind.Albedo] = albedo;
+        set.Maps[MapKind.Diffuse] = albedo.Clone();
         set.Maps[MapKind.Height] = Grayscale(height, source.Width, source.Height);
         set.Maps[MapKind.Normal] = Normal(height, source.Width, source.Height, normalStrength);
         set.Maps[MapKind.Roughness] = Constant(source.Width, source.Height, (byte)(Math.Clamp(MaterialRoughness(material, roughness), 0, 1) * 255));
@@ -63,4 +69,3 @@ public sealed class PbrGenerator
     private static ImageBuffer Normal(float[] v, int w, int h, float strength) { var r = new ImageBuffer(w, h); for (var y = 0; y < h; y++) for (var x = 0; x < w; x++) { float V(int xx, int yy) => v[Math.Clamp(yy, 0, h - 1) * w + Math.Clamp(xx, 0, w - 1)] / 255f; var dx = (V(x + 1, y) - V(x - 1, y)) * strength; var dy = (V(x, y + 1) - V(x, y - 1)) * strength; var n = System.Numerics.Vector3.Normalize(new(-dx, -dy, 1)); var p = (y * w + x) * 4; r.Pixels[p] = (byte)((n.X * .5f + .5f) * 255); r.Pixels[p + 1] = (byte)((n.Y * .5f + .5f) * 255); r.Pixels[p + 2] = (byte)((n.Z * .5f + .5f) * 255); r.Pixels[p + 3] = 255; } return r; }
     private static ImageBuffer AmbientOcclusion(float[] v, int w, int h) { var blur = BoxBlur(v, w, h, Math.Max(2, Math.Min(w, h) / 128)); var r = new ImageBuffer(w, h); for (var i = 0; i < v.Length; i++) { var ao = (byte)Math.Clamp(245 + (v[i] - blur[i]) * .3f, 150, 255); r.Pixels[i * 4] = r.Pixels[i * 4 + 1] = r.Pixels[i * 4 + 2] = ao; r.Pixels[i * 4 + 3] = 255; } return r; }
 }
-

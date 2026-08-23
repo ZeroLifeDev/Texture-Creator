@@ -12,13 +12,27 @@ public static class ProjectStore
 
 public static class TextureExporter
 {
-    private static readonly Dictionary<MapKind, string> Names = new() { [MapKind.Albedo] = "BaseColor", [MapKind.Roughness] = "Roughness", [MapKind.Normal] = "Normal", [MapKind.Height] = "Height", [MapKind.Metalness] = "Metallic", [MapKind.AmbientOcclusion] = "AO", [MapKind.Coverage] = "Coverage" };
+    private static readonly Dictionary<MapKind, string> Names = new() { [MapKind.Diffuse] = "Diffuse", [MapKind.Albedo] = "Albedo", [MapKind.Roughness] = "Roughness", [MapKind.Normal] = "Normal", [MapKind.Height] = "Displacement", [MapKind.Metalness] = "Metalness", [MapKind.AmbientOcclusion] = "AO", [MapKind.Coverage] = "Coverage" };
     public static IReadOnlyList<string> Export(TextureSet set, string directory, string assetName)
     {
         assetName = string.Concat(assetName.Select(c => Path.GetInvalidFileNameChars().Contains(c) ? '_' : c)); Directory.CreateDirectory(directory); var paths = new List<string>();
         foreach (var (kind, image) in set.Maps) { var path = Path.Combine(directory, $"{assetName}_{Names[kind]}.png"); ImageIo.SavePng(image, path); paths.Add(path); }
         return paths;
     }
+
+    public static IReadOnlyList<string> ExportZip(TextureSet set, string zipPath, string assetName, IEnumerable<MapKind> maps)
+    {
+        assetName = SafeAssetName(assetName); Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(zipPath))!); var names = new List<string>();
+        using var stream = new FileStream(zipPath, FileMode.Create, FileAccess.Write, FileShare.None); using var archive = new ZipArchive(stream, ZipArchiveMode.Create);
+        foreach (var kind in maps.Distinct())
+        {
+            if (!set.Maps.TryGetValue(kind, out var image)) throw new InvalidOperationException($"Texture set does not contain {kind}.");
+            var name = $"{assetName}_{Names[kind]}.png"; var entry = archive.CreateEntry(name, CompressionLevel.Optimal); using var output = entry.Open(); var bytes = ImageIo.EncodePng(image); output.Write(bytes); names.Add(name);
+        }
+        return names;
+    }
+
+    private static string SafeAssetName(string assetName) => string.Concat(assetName.Select(c => Path.GetInvalidFileNameChars().Contains(c) ? '_' : c));
 }
 
 public interface IImageGenerationProvider
@@ -39,4 +53,3 @@ public sealed class ChatGptWebAssistProvider : IImageGenerationProvider
         return Task.FromResult(new ProviderResult(false, $"Files were prepared in {dir}. Open https://chatgpt.com in your normal browser, sign in interactively, attach the files, and request: {operation}. Save the result, then import it into Texture Creator. No cookies, tokens, or private APIs are accessed."));
     }
 }
-

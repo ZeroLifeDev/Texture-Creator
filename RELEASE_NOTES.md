@@ -1,37 +1,49 @@
-# PBR Reference Forge v0.1.0-alpha
+# PBR Reference Forge v0.2.0-alpha
 
-This is the first public alpha of PBR Reference Forge, a self-contained native Windows tool for projecting reference photos into the UV space of an existing mesh and deriving a coherent metallic/roughness texture set locally.
+This alpha makes the most common workflow the main screen: import a UV-mapped model, import one texture reference, and receive the six requested PBR maps in a ZIP.
 
-## Implemented
+## New in v0.2.0-alpha
 
-- OBJ, GLB and GLTF mesh import with explicit UV validation
-- Multiple Front/Back/Left/Right/Top/Bottom reference views
-- UV-space orthographic projection with grazing-angle weighting, blending and confidence coverage
-- Locally corrected albedo plus related roughness, metallic, normal, height, AO and coverage maps
-- Material-aware PBR defaults, topology-based seam detection and UV padding primitives
-- Realtime lit 3D orbit/zoom preview, reference overlay, UV inspector and map soloing
-- Non-destructive `.tforge` save/open, autosave recovery, logs and background generation
-- Engine-friendly PNG export names
-- Consent-gated, semi-automatic ChatGPT Web Assist adapter using only the normal user-facing website
+- New Quick Texture Export is now the default screen
+- Clear UV model and texture-reference selection cards with live validation
+- One-click `Generate PBR ZIP` workflow
+- ZIP contains exactly:
+  - `Asset_Diffuse.png`
+  - `Asset_Albedo.png`
+  - `Asset_Roughness.png`
+  - `Asset_Normal.png`
+  - `Asset_Displacement.png`
+  - `Asset_Metalness.png`
+- Resolution selection for 1K, 2K, 4K and hardware-permitting 8K output
+- Material classification selector on the quick screen
+- Existing multi-reference 3D/UV workflow retained as an optional Advanced Workspace
+- Release now provides both a directly runnable standalone EXE and a portable ZIP
+
+## Existing pipeline
+
+- OBJ, GLB and GLTF mesh import with explicit missing-UV rejection
+- UV-space reference projection, coverage tracking and coherent PBR derivation
+- Local processing with no paid API requirement
+- Project save/open, realtime preview, logging and consent-gated Web Assist in Advanced Workspace
 
 ## Requirements
 
 - Windows 10 22H2 or Windows 11, x64
-- No separate .NET runtime, paid API or GPU required
-- A CUDA/NVIDIA GPU is not currently used by the deterministic alpha pipeline
+- No separate .NET runtime or GPU required
+- 8K output requires substantial system memory; 2K is the default
 
 ## Limitations / known issues
 
-- Alpha-quality, unsigned build; Windows SmartScreen may display a warning
-- Role-based orthographic alignment only; perspective lens solving and alignment gizmos are limited
-- No full paint layer system, cross-island Poisson blending, UDIM, FBX, local ML model manager or CUDA inference yet
-- Height is an inferred 8-bit PNG, not measured geometry or 16-bit/EXR displacement
+- Alpha-quality unsigned executable; Windows SmartScreen may warn
+- Quick mode uses the selected reference as a Front projection
+- Perspective camera solving and alignment gizmos remain in development
+- Displacement is inferred 8-bit PNG rather than measured 16-bit/EXR geometry
+- No FBX, UDIM, full paint-layer system, CUDA inference or local ML model manager yet
 - GLTF sparse accessors and Draco/meshopt compression are unsupported
-- Preview is a practical WPF lit viewport, not a path-traced PBR renderer
-- Web Assist is deliberately semi-automatic and requires manual login/upload/download
 
 ## Verification
 
 - Release build: 0 warnings, 0 errors
-- Automated tests: 11 passed, 0 failed
-- Self-contained packaged executable: clean-directory startup, window-title and responsiveness smoke test passed
+- Automated tests: 13 passed, 0 failed
+- Quick ZIP test verifies the exact six output maps
+- Standalone EXE clean-directory startup and responsiveness smoke test passed
