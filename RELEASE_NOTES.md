@@ -1,8 +1,8 @@
-# PBR Reference Forge v0.2.0-alpha
+# PBR Reference Forge v0.2.1-alpha
 
-This alpha makes the most common workflow the main screen: import a UV-mapped model, import one texture reference, and receive the six requested PBR maps in a ZIP.
+This patch release validates the complete executable workflow on a real UV asset and reference image: import, project, derive all maps, create the ZIP, and decode each generated PNG.
 
-## New in v0.2.0-alpha
+## New and verified in v0.2.1-alpha
 
 - New Quick Texture Export is now the default screen
 - Clear UV model and texture-reference selection cards with live validation
@@ -18,6 +18,8 @@ This alpha makes the most common workflow the main screen: import a UV-mapped mo
 - Material classification selector on the quick screen
 - Existing multi-reference 3D/UV workflow retained as an optional Advanced Workspace
 - Release now provides both a directly runnable standalone EXE and a portable ZIP
+- Added a supported `--quick-export model reference output.zip [resolution]` executable route for repeatable full-pipeline validation and batch use
+- Exercised the packaged pipeline on the bundled UV asset; all six output maps decoded successfully at the requested dimensions
 
 ## Existing pipeline
 

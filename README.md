@@ -6,7 +6,7 @@ PBR Reference Forge is a native Windows desktop application that helps artists t
 
 ![PBR Reference Forge main workspace](docs/screenshots/main-workspace.png)
 
-## What works in v0.2.0-alpha
+## What works in v0.2.1-alpha
 
 - Native dark Windows workspace with 3D orbit/zoom preview and UV inspection
 - Default three-step Quick Texture Export: choose a UV model, choose a reference, generate a ZIP
@@ -26,7 +26,7 @@ PBR Reference Forge is a native Windows desktop application that helps artists t
 
 ## Install
 
-Download either the standalone `PBR-Reference-Forge-v0.2.0-alpha-win-x64.exe` or the portable ZIP from Releases. Windows 10 22H2 or Windows 11 x64 is recommended. The build is self-contained; no separate .NET install is required. If SmartScreen appears for the unsigned alpha, verify the download came from this repository, choose **More info**, then **Run anyway**.
+Download either the standalone `PBR-Reference-Forge-v0.2.1-alpha-win-x64.exe` or the portable ZIP from Releases. Windows 10 22H2 or Windows 11 x64 is recommended. The build is self-contained; no separate .NET install is required. If SmartScreen appears for the unsigned alpha, verify the download came from this repository, choose **More info**, then **Run anyway**.
 
 ## Workflow
 
