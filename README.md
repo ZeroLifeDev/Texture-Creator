@@ -1,15 +1,18 @@
 # PBR Reference Forge
 
-PBR Reference Forge is a native Windows desktop application that helps artists turn photographs into a coherent, editable metallic/roughness PBR texture set for an existing UV-mapped mesh. It prioritizes artist-usable output and transparent evidence coverage over claims of physically exact reconstruction.
+PBR Reference Forge is a native Windows desktop application that helps artists turn photographs into a coherent metallic/roughness PBR texture set using either an existing UV-mapped mesh or a UV layout image. It prioritizes artist-usable output and transparent evidence coverage over claims of physically exact reconstruction.
 
 > **Alpha software:** Back up work and validate maps in your target renderer. Reconstructed albedo, roughness, normals, height, metalness and AO are informed estimates, not measured material properties.
 
 ![PBR Reference Forge main workspace](docs/screenshots/main-workspace.png)
 
-## What works in v0.2.1-alpha
+## What works in v0.3.0-alpha
 
 - Native dark Windows workspace with 3D orbit/zoom preview and UV inspection
 - Default three-step Quick Texture Export: choose a UV model, choose a reference, generate a ZIP
+- Alternative image-only workflow: choose a UV layout PNG/JPG instead of a 3D model
+- UV image boundary detection, enclosed-island fill, padding and explicit fallback behavior
+- **Sign in / Choose ChatGPT Account** button opens normal ChatGPT web account selection without reading credentials, cookies or tokens
 - Quick ZIP contains exactly Diffuse, Albedo, Roughness, Normal, Displacement and Metalness PNG maps
 - The full multi-reference inspection workflow remains available under **Advanced Workspace**
 - OBJ, GLB and GLTF import with explicit missing-UV validation
@@ -26,11 +29,11 @@ PBR Reference Forge is a native Windows desktop application that helps artists t
 
 ## Install
 
-Download either the standalone `PBR-Reference-Forge-v0.2.1-alpha-win-x64.exe` or the portable ZIP from Releases. Windows 10 22H2 or Windows 11 x64 is recommended. The build is self-contained; no separate .NET install is required. If SmartScreen appears for the unsigned alpha, verify the download came from this repository, choose **More info**, then **Run anyway**.
+Download either the standalone `PBR-Reference-Forge-v0.3.0-alpha-win-x64.exe` or the portable ZIP from Releases. Windows 10 22H2 or Windows 11 x64 is recommended. The build is self-contained; no separate .NET install is required. If SmartScreen appears for the unsigned alpha, verify the download came from this repository, choose **More info**, then **Run anyway**.
 
 ## Workflow
 
-1. Choose an OBJ, GLB or GLTF model. Generation is blocked if the mesh lacks UVs.
+1. Choose either an OBJ/GLB/GLTF model with UVs or a UV layout image.
 2. Choose a PNG/JPEG/WebP texture reference.
 3. Select resolution and material, then click **Generate PBR ZIP**.
 4. Receive Diffuse, Albedo, Roughness, Normal, Displacement and Metalness maps in one ZIP.
@@ -44,7 +47,7 @@ Core import, correction, generation and export are fully local and CPU-based. No
 
 | Purpose | Formats |
 |---|---|
-| Models | OBJ, GLB, GLTF |
+| UV sources | OBJ, GLB, GLTF, or PNG/JPG/JPEG/WebP UV layout image |
 | References | PNG, JPG/JPEG, WebP when the Windows codec is installed |
 | Export | 8-bit PNG maps |
 | Projects | `.tforge` JSON project documents |

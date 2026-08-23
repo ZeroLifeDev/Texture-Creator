@@ -24,6 +24,12 @@ public sealed class PipelineTests
         var projection = new ProjectionEngine().Project(mesh, [(new ReferenceImage { Role = ReferenceRole.Front }, Pattern(64))], 128); var set = new PbrGenerator().Generate(projection.Surface, MaterialKind.Dielectric, .55f, 0, 1); var zip = TempFile(".zip"); TextureExporter.ExportZip(set, zip, "QuickTest", [MapKind.Diffuse, MapKind.Albedo, MapKind.Roughness, MapKind.Normal, MapKind.Height, MapKind.Metalness]);
         using var archive = System.IO.Compression.ZipFile.OpenRead(zip); Assert.Equal(6, archive.Entries.Count); Assert.All(archive.Entries, entry => { Assert.EndsWith(".png", entry.Name); Assert.True(entry.Length > 100); using var stream = entry.Open(); Span<byte> signature = stackalloc byte[8]; Assert.Equal(8, stream.Read(signature)); Assert.Equal(new byte[] { 137, 80, 78, 71, 13, 10, 26, 10 }, signature.ToArray()); });
     }
+    [Fact] public void UvLayoutImageDetectsAndFillsClosedIsland()
+    {
+        var layout = new ImageBuffer(64, 64); for (var i = 0; i < 64 * 64; i++) { layout.Pixels[i * 4] = layout.Pixels[i * 4 + 1] = layout.Pixels[i * 4 + 2] = layout.Pixels[i * 4 + 3] = 255; } for (var x = 12; x <= 51; x++) { SetBlack(x, 12); SetBlack(x, 51); } for (var y = 12; y <= 51; y++) { SetBlack(12, y); SetBlack(51, y); }
+        var result = new UvLayoutProjector().Project(layout, Pattern(32), 64); Assert.InRange(result.ObservedTexels, 1500, 1800); Assert.Equal(255, result.Surface.Pixels[result.Surface.Offset(32, 32) + 3]); Assert.Equal(0, result.Surface.Pixels[result.Surface.Offset(2, 2) + 3]);
+        void SetBlack(int x, int y) { var p = layout.Offset(x, y); layout.Pixels[p] = layout.Pixels[p + 1] = layout.Pixels[p + 2] = 0; }
+    }
     [Fact] public void ImageLoadRoundTripsPng() { var p = TempFile(".png"); ImageIo.SavePng(Pattern(12), p); var i = ImageIo.Load(p); Assert.Equal(12, i.Width); Assert.Equal(12, i.Height); }
     [Fact] public void ProjectionMapsReferenceIntoUvSpace() { var p = TempFile(".obj"); File.WriteAllText(p, "v -1 -1 0\nv 1 -1 0\nv 0 1 0\nvt 0 0\nvt 1 0\nvt .5 1\nf 1/1 2/2 3/3\n"); var m = ModelImporter.Load(p); var result = new ProjectionEngine().Project(m, [(new ReferenceImage { Role = ReferenceRole.Front }, Pattern(16))], 64); Assert.True(result.ObservedTexels > 1000); Assert.Equal(255, result.Surface.Pixels[32 * 64 * 4 + 32 * 4 + 3]); }
     [Fact] public void GlbImportReadsTriangleAndUvs()

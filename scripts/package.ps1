@@ -1,4 +1,4 @@
-param([string]$Version = "v0.2.1-alpha")
+param([string]$Version = "v0.3.0-alpha")
 $ErrorActionPreference = "Stop"
 $root = Resolve-Path (Join-Path $PSScriptRoot "..")
 $out = Join-Path $root "artifacts\publish\win-x64"

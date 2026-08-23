@@ -1,11 +1,14 @@
-# PBR Reference Forge v0.2.1-alpha
+# PBR Reference Forge v0.3.0-alpha
 
-This patch release validates the complete executable workflow on a real UV asset and reference image: import, project, derive all maps, create the ZIP, and decode each generated PNG.
+This release adds UV layout images as a first-class alternative to 3D models and provides a safe browser-based ChatGPT account chooser.
 
-## New and verified in v0.2.1-alpha
+## New and verified in v0.3.0-alpha
 
 - New Quick Texture Export is now the default screen
-- Clear UV model and texture-reference selection cards with live validation
+- UV Source card now accepts either a UV-mapped 3D model or a UV layout image
+- Image-only projection detects boundaries, flood-fills enclosed UV islands and pads their edges
+- Low-confidence UV layouts fall back visibly instead of silently pretending geometry exists
+- Added **Sign in / Choose ChatGPT Account**, which opens normal ChatGPT web account selection and never accesses cookies, credentials or tokens
 - One-click `Generate PBR ZIP` workflow
 - ZIP contains exactly:
   - `Asset_Diffuse.png`
@@ -19,6 +22,7 @@ This patch release validates the complete executable workflow on a real UV asset
 - Existing multi-reference 3D/UV workflow retained as an optional Advanced Workspace
 - Release now provides both a directly runnable standalone EXE and a portable ZIP
 - Added a supported `--quick-export model reference output.zip [resolution]` executable route for repeatable full-pipeline validation and batch use
+- Added `--quick-export-uv uv-layout.png reference.png output.zip [resolution]` for repeatable image-only validation and batch use
 - Exercised the packaged pipeline on the bundled UV asset; all six output maps decoded successfully at the requested dimensions
 
 ## Existing pipeline
@@ -38,6 +42,7 @@ This patch release validates the complete executable workflow on a real UV asset
 
 - Alpha-quality unsigned executable; Windows SmartScreen may warn
 - Quick mode uses the selected reference as a Front projection
+- Image-only mode cannot infer 3D camera angles or occluded geometry; it fits the reference into detected UV islands
 - Perspective camera solving and alignment gizmos remain in development
 - Displacement is inferred 8-bit PNG rather than measured 16-bit/EXR geometry
 - No FBX, UDIM, full paint-layer system, CUDA inference or local ML model manager yet
@@ -46,6 +51,8 @@ This patch release validates the complete executable workflow on a real UV asset
 ## Verification
 
 - Release build: 0 warnings, 0 errors
-- Automated tests: 13 passed, 0 failed
+- Automated tests: 14 passed, 0 failed
 - Quick ZIP test verifies the exact six output maps
+- UV layout closed-island detection/fill test passed
+- Image-only executable export produced and decoded all six requested maps
 - Standalone EXE clean-directory startup and responsiveness smoke test passed

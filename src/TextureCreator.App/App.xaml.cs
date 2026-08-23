@@ -8,7 +8,7 @@ public partial class App : Application
     protected override void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
-        if (e.Args.Length is 4 or 5 && e.Args[0] == "--quick-export")
+        if ((e.Args.Length is 4 or 5) && (e.Args[0] == "--quick-export" || e.Args[0] == "--quick-export-uv"))
         {
             RunQuickExport(e.Args); Shutdown(); return;
         }
@@ -29,9 +29,10 @@ public partial class App : Application
         try
         {
             var resolution = args.Length == 5 ? int.Parse(args[4]) : 2048; if (resolution is < 64 or > 8192) throw new ArgumentOutOfRangeException(nameof(resolution), "Resolution must be from 64 to 8192.");
-            var mesh = ModelImporter.Load(args[1]); if (!mesh.HasUvs) throw new InvalidOperationException("The supplied model has no complete UV coordinates."); var reference = ImageIo.Load(args[2]);
-            var projection = new ProjectionEngine().Project(mesh, [(new ReferenceImage { Path = args[2], Role = ReferenceRole.Front }, reference)], resolution); var set = new PbrGenerator().Generate(projection.Surface, MaterialKind.Dielectric, .55f, 0, 1); set.Maps[MapKind.Coverage] = projection.Coverage;
-            TextureExporter.ExportZip(set, output, Path.GetFileNameWithoutExtension(args[1]), [MapKind.Diffuse, MapKind.Albedo, MapKind.Roughness, MapKind.Normal, MapKind.Height, MapKind.Metalness]); Environment.ExitCode = 0;
+            var reference = ImageIo.Load(args[2]); ProjectionResult projection;
+            if (args[0] == "--quick-export-uv") { var layout = ImageIo.Load(args[1]); projection = new UvLayoutProjector().Project(layout, reference, resolution); }
+            else { var mesh = ModelImporter.Load(args[1]); if (!mesh.HasUvs) throw new InvalidOperationException("The supplied model has no complete UV coordinates."); projection = new ProjectionEngine().Project(mesh, [(new ReferenceImage { Path = args[2], Role = ReferenceRole.Front }, reference)], resolution); }
+            var set = new PbrGenerator().Generate(projection.Surface, MaterialKind.Dielectric, .55f, 0, 1); set.Maps[MapKind.Coverage] = projection.Coverage; TextureExporter.ExportZip(set, output, Path.GetFileNameWithoutExtension(args[1]), [MapKind.Diffuse, MapKind.Albedo, MapKind.Roughness, MapKind.Normal, MapKind.Height, MapKind.Metalness]); Environment.ExitCode = 0;
         }
         catch (Exception ex)
         {
