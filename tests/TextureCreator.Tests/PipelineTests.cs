@@ -18,6 +18,8 @@ public sealed class PipelineTests
         var path = TempFile(".json"); var confirmed = DateTimeOffset.UtcNow; AppPreferenceStore.Save(new(true, confirmed), path); var loaded = AppPreferenceStore.Load(path); Assert.True(loaded.ChatGptBrowserReady); Assert.Equal(confirmed, loaded.ConfirmedUtc); var json = File.ReadAllText(path); Assert.DoesNotContain("password", json, StringComparison.OrdinalIgnoreCase); Assert.DoesNotContain("token", json, StringComparison.OrdinalIgnoreCase); Assert.DoesNotContain("cookie", json, StringComparison.OrdinalIgnoreCase);
     }
     [Fact] public void CorruptPreferencesFallBackSafely() { var path = TempFile(".json"); File.WriteAllText(path, "not-json"); Assert.False(AppPreferenceStore.Load(path).ChatGptBrowserReady); }
+    [Fact] public void CodexInstallerUsesOfficialOpenAiRelease() { Assert.StartsWith("https://github.com/openai/codex/", CodexBridge.OfficialDownload); Assert.Contains("x86_64-pc-windows-msvc", CodexBridge.OfficialDownload); }
+    [Fact] public void GeneratedImageCanBeResizedToRequestedTextureResolution() { var resized = ImageResizer.Resize(Pattern(16), 64, 32); Assert.Equal(64, resized.Width); Assert.Equal(32, resized.Height); Assert.Equal(255, resized.Pixels[3]); }
     [Fact] public void PbrMapsAreConsistentDimensions() { var src = Pattern(32); var set = new PbrGenerator().Generate(src, MaterialKind.BareMetal, .3f, .8f, 1); Assert.Equal(8, set.Maps.Count); Assert.All(set.Maps.Values, x => { Assert.Equal(32, x.Width); Assert.Equal(32, x.Height); }); Assert.True(set[MapKind.Metalness].Pixels[0] > 200); Assert.Equal(set[MapKind.Albedo].Pixels, set[MapKind.Diffuse].Pixels); }
     [Fact] public void HeightMapSuppressesLightingGradientAndRecessesDarkCracks()
     {

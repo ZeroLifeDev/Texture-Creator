@@ -6,13 +6,14 @@ PBR Reference Forge is a native Windows desktop application that helps artists t
 
 ![PBR Reference Forge main workspace](docs/screenshots/main-workspace.png)
 
-## What works in v0.3.2-alpha
+## What works in v0.4.0-alpha
 
 - Native dark Windows workspace with 3D orbit/zoom preview and UV inspection
 - Default three-step Quick Texture Export: choose a UV model, choose a reference, generate a ZIP
 - Alternative image-only workflow: choose a UV layout PNG/JPG instead of a 3D model
 - UV image boundary detection, enclosed-island fill, padding and explicit fallback behavior
-- **Connect ChatGPT Browser Account** opens normal ChatGPT in the default browser and can persist a local readiness confirmation without reading credentials, cookies, tokens or account identity
+- **Set Up Codex + GPT** installs the official Codex CLI when needed and uses Codex OAuth through the normal ChatGPT sign-in flow
+- Generate invokes real GPT image generation with the UV layout and reference attached; it never silently substitutes the local projector
 - Quick ZIP contains exactly Diffuse, Albedo, Roughness, Normal, Displacement and Metalness PNG maps
 - The full multi-reference inspection workflow remains available under **Advanced Workspace**
 - OBJ, GLB and GLTF import with explicit missing-UV validation
@@ -29,7 +30,7 @@ PBR Reference Forge is a native Windows desktop application that helps artists t
 
 ## Install
 
-Download either the standalone `PBR-Reference-Forge-v0.3.2-alpha-win-x64.exe` or the portable ZIP from Releases. Windows 10 22H2 or Windows 11 x64 is recommended. The build is self-contained; no separate .NET install is required. If SmartScreen appears for the unsigned alpha, verify the download came from this repository, choose **More info**, then **Run anyway**.
+Download either the standalone `PBR-Reference-Forge-v0.4.0-alpha-win-x64.exe` or the portable ZIP from Releases. Windows 10 22H2 or Windows 11 x64 is recommended. The build is self-contained; no separate .NET install is required. The first GPT setup downloads the official Codex CLI (approximately 300 MB) and may open a browser for ChatGPT OAuth. If SmartScreen appears for the unsigned alpha, verify the download came from this repository, choose **More info**, then **Run anyway**.
 
 ## Workflow
 

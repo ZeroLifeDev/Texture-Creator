@@ -17,7 +17,7 @@ public partial class MainWindow : Window
     private ForgeProject project = new(); private MeshData? mesh; private TextureSet? textures; private string? projectPath; private string? uvLayoutImagePath; private Point dragStart; private double yaw = 25, pitch = -15, distance = 4; private bool dragging; private bool synchronizingReferenceUi;
     private readonly string logPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "PBRReferenceForge", "logs", "app.log");
     private readonly string preferencesPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "PBRReferenceForge", "preferences.json");
-    private AppPreferences preferences = new();
+    private AppPreferences preferences = new(); private readonly CodexBridge codexBridge = new();
     public MainWindow()
     {
         InitializeComponent(); Directory.CreateDirectory(Path.GetDirectoryName(logPath)!); Log("Application started");
@@ -75,10 +75,12 @@ public partial class MainWindow : Window
         QuickGenerateButton.IsEnabled = false; QuickProgress.Visibility = Visibility.Visible; QuickProgress.Value = 0; QuickStatus.Text = "Projecting the reference into UV space…";
         try
         {
-            ProjectionResult projection;
-            if (!string.IsNullOrWhiteSpace(uvLayoutImagePath)) { var layout = ImageIo.Load(uvLayoutImagePath); var reference = ImageIo.Load(project.References[0].Path); QuickStatus.Text = "Detecting UV islands and fitting the reference…"; projection = await Task.Run(() => new UvLayoutProjector().Project(layout, reference, resolution)); QuickProgress.Value = 55; }
-            else { var sourceFiles = project.References.Select(r => (r, ImageIo.Load(r.Path))).ToArray(); var projectionProgress = new Progress<double>(v => QuickProgress.Value = v * 55); projection = await Task.Run(() => new ProjectionEngine().Project(mesh!, sourceFiles, resolution, projectionProgress)); }
-            QuickStatus.Text = "Deriving consistent PBR maps…"; QuickProgress.Value = 62; textures = await Task.Run(() => new PbrGenerator().Generate(projection.Surface, project.DefaultMaterial, project.Roughness, project.Metalness, project.NormalStrength)); textures.Maps[MapKind.Coverage] = projection.Coverage; QuickProgress.Value = 88;
+            var codex = await codexBridge.GetStatusAsync(); if (!codex.Installed || !codex.LoggedIn) throw new InvalidOperationException("Codex GPT is not ready. Click Set Up Codex + GPT first. Local fallback is disabled.");
+            var job = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "PBRReferenceForge", "jobs", Guid.NewGuid().ToString("N")); Directory.CreateDirectory(job); string layoutPath; ImageBuffer layout;
+            if (!string.IsNullOrWhiteSpace(uvLayoutImagePath)) { layoutPath = Path.GetFullPath(uvLayoutImagePath); layout = ImageIo.Load(layoutPath); }
+            else { layout = UvServices.RasterizeUvCoverage(mesh!, Math.Min(resolution, 2048)); layoutPath = Path.Combine(job, "uv-layout.png"); ImageIo.SavePng(layout, layoutPath); }
+            QuickStatus.Text = "Codex is generating the UV texture with GPT Image…"; QuickProgress.Value = 25; var generatedPath = await codexBridge.GenerateUvTextureAsync(layoutPath, project.References[0].Path, job); QuickProgress.Value = 72; var generated = ImageResizer.Resize(ImageIo.Load(generatedPath), resolution, resolution); var coverage = new UvLayoutProjector().Project(layout, generated, resolution).Coverage;
+            QuickStatus.Text = "Deriving PBR maps from the GPT texture…"; textures = await Task.Run(() => new PbrGenerator().Generate(generated, project.DefaultMaterial, project.Roughness, project.Metalness, project.NormalStrength)); textures.Maps[MapKind.Coverage] = coverage; QuickProgress.Value = 88;
             var requested = new[] { MapKind.Diffuse, MapKind.Albedo, MapKind.Roughness, MapKind.Normal, MapKind.Height, MapKind.Metalness }; var names = await Task.Run(() => TextureExporter.ExportZip(textures, save.FileName, project.Name, requested)); QuickProgress.Value = 100; ShowMaps(); QuickStatus.Text = $"Done — {names.Count} maps saved in {Path.GetFileName(save.FileName)}"; Status.Text = QuickStatus.Text; Log($"Quick exported {save.FileName}"); MessageBox.Show($"Your PBR texture ZIP is ready.\n\n{save.FileName}\n\nDiffuse, Albedo, Roughness, Normal, Displacement and Metalness are included.", "PBR ZIP created", MessageBoxButton.OK, MessageBoxImage.Information); Process.Start("explorer.exe", $"/select,\"{save.FileName}\"");
         }
         catch (Exception ex) { Error(ex); QuickStatus.Text = "Generation failed — details were written to the log"; }
@@ -86,13 +88,10 @@ public partial class MainWindow : Window
     }
     private async void WebAssist_Click(object sender, RoutedEventArgs e) { if (textures is null) { MessageBox.Show("Generate maps first so Web Assist has controlled input.", "Web Assist"); return; } if (MessageBox.Show("Web Assist sends files outside this computer only after you manually attach them in your browser. Continue preparing files?", "External processing disclosure", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes) return; var r = await new ChatGptWebAssistProvider().PrepareAsync(textures[MapKind.Albedo], textures.Maps.GetValueOrDefault(MapKind.Coverage), "clean lighting and repair only masked unseen regions", default); MessageBox.Show(r.Instructions, "Semi-automatic Web Assist", MessageBoxButton.OK, MessageBoxImage.Information); Process.Start(new ProcessStartInfo("https://chatgpt.com") { UseShellExecute = true }); }
     private void Logs_Click(object sender, RoutedEventArgs e) { Process.Start("explorer.exe", $"/select,\"{logPath}\""); }
-    private void About_Click(object sender, RoutedEventArgs e) => MessageBox.Show("PBR Reference Forge v0.3.2-alpha\n\nAccepts UV-mapped 3D models or UV layout images. Reconstruction is inferred and not physically measured.", "About");
-    private void ChatGptSignIn_Click(object sender, RoutedEventArgs e)
+    private void About_Click(object sender, RoutedEventArgs e) => MessageBox.Show("PBR Reference Forge v0.4.0-alpha\n\nUses real GPT image generation through Codex OAuth. No API key and no silent local fallback.", "About");
+    private async void ChatGptSignIn_Click(object sender, RoutedEventArgs e)
     {
-        Process.Start(new ProcessStartInfo("https://chatgpt.com/") { UseShellExecute = true });
-        var confirmed = MessageBox.Show("ChatGPT opened in your normal browser. Sign in or switch accounts there, then return here.\n\nMark this browser account as ready for Web Assist?\n\nThe app saves only this readiness setting. Your browser keeps the actual login; the app never reads passwords, cookies, tokens, or account identity.", "Connect ChatGPT browser account", MessageBoxButton.YesNo, MessageBoxImage.Information) == MessageBoxResult.Yes;
-        if (!confirmed) { QuickStatus.Text = "Account connection not marked ready — try again anytime"; return; }
-        preferences = new AppPreferences(true, DateTimeOffset.UtcNow); AppPreferenceStore.Save(preferences, preferencesPath); UpdateAccountUi(); QuickStatus.Text = "ChatGPT browser account marked ready — this setting will persist"; Log("ChatGPT browser account marked ready (no credentials stored)");
+        ChatGptAccountButton.IsEnabled = false; try { var status = await codexBridge.GetStatusAsync(); if (!status.Installed) { if (MessageBox.Show("Codex CLI is required for real GPT image generation. Download and install the official OpenAI Codex CLI now?", "Install Codex", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes) return; QuickStatus.Text = "Downloading official Codex CLI…"; await codexBridge.InstallAsync(new Progress<double>(v => QuickStatus.Text = $"Downloading Codex… {v:P0}")); status = await codexBridge.GetStatusAsync(); } if (!status.LoggedIn) { QuickStatus.Text = "Opening secure Codex sign-in…"; await codexBridge.LoginAsync(); status = await codexBridge.GetStatusAsync(); } if (!status.LoggedIn) throw new InvalidOperationException("Codex sign-in was not completed."); ChatGptAccountButton.Content = "Codex + GPT Ready  ✓"; QuickStatus.Text = "Codex OAuth connected — real GPT generation is ready"; Log("Codex OAuth verified"); } catch (Exception ex) { Error(ex); QuickStatus.Text = "Codex setup failed — see error and logs"; } finally { ChatGptAccountButton.IsEnabled = true; }
     }
     private void ShowAdvanced_Click(object sender, RoutedEventArgs e) { QuickWorkspace.Visibility = Visibility.Collapsed; }
     private void ShowQuick_Click(object sender, RoutedEventArgs e) { QuickWorkspace.Visibility = Visibility.Visible; }
@@ -107,7 +106,7 @@ public partial class MainWindow : Window
         _ = ImageIo.Load(path); synchronizingReferenceUi = true; try { ReferenceList.SelectedIndex = -1; ReferenceList.Items.Clear(); project.References.Clear(); project.References.Add(new() { Path = path, Role = ReferenceRole.Front }); ReferenceList.Items.Add($"{Path.GetFileName(path)}  [Front]"); QuickReferenceLabel.Text = Path.GetFileName(path); SetQuickReferencePreview(path); RoleCombo.SelectedItem = ReferenceRole.Front; ReferenceList.SelectedIndex = 0; } finally { synchronizingReferenceUi = false; } QuickStatus.Text = "Reference loaded — ready to generate"; Log($"Imported quick reference {path}");
     }
     internal bool HasQuickReference => project.References.Count == 1 && ReferenceList.Items.Count == 1 && ReferenceList.SelectedIndex == 0;
-    private void UpdateAccountUi() { ChatGptAccountButton.Content = preferences.ChatGptBrowserReady ? "ChatGPT Browser Ready  ✓" : "Connect ChatGPT Browser Account"; }
+    private void UpdateAccountUi() { ChatGptAccountButton.Content = "Set Up Codex + GPT"; }
 
     private void RenderMesh()
     {

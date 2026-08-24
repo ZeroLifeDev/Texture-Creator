@@ -8,6 +8,10 @@ public partial class App : Application
     protected override void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
+        if (e.Args.Length == 2 && e.Args[0] == "--codex-bootstrap")
+        {
+            RunCodexBootstrap(e.Args[1]); Shutdown(); return;
+        }
         if (e.Args.Length == 5 && e.Args[0] == "--ui-smoke")
         {
             RunUiSmoke(e.Args); Shutdown(); return;
@@ -25,6 +29,12 @@ public partial class App : Application
             window.Close(); Shutdown(); return;
         }
         window.Show();
+    }
+
+    private static void RunCodexBootstrap(string statusPath)
+    {
+        try { var status = Task.Run(async () => { var bridge = new CodexBridge(); var current = await bridge.GetStatusAsync(); if (!current.Installed) { await bridge.InstallAsync(); current = await bridge.GetStatusAsync(); } return current; }).GetAwaiter().GetResult(); File.WriteAllText(Path.GetFullPath(statusPath), $"Installed={status.Installed}; LoggedIn={status.LoggedIn}; {status.Detail}"); Environment.ExitCode = status.Installed ? 0 : 1; }
+        catch (Exception ex) { File.WriteAllText(Path.GetFullPath(statusPath), "FAIL: " + ex); Environment.ExitCode = 1; }
     }
 
     private static void RunUiSmoke(string[] args)

@@ -1,4 +1,19 @@
-# PBR Reference Forge v0.3.2-alpha
+# PBR Reference Forge v0.4.0-alpha
+
+This release replaces the misleading browser-account/local-generation flow with real GPT image generation through Codex OAuth.
+
+## New and verified in v0.4.0-alpha
+
+- Downloads the official standalone OpenAI Codex CLI automatically when missing
+- Uses Codex `login` and the existing ChatGPT OAuth session; no API key required
+- Attaches both the UV layout and material reference to a real non-interactive Codex task
+- Requires Codex to invoke GPT image generation and save a verified PNG before PBR derivation
+- Disables silent local fallback: missing Codex, missing login or missing generated image stops export with a clear error
+- Resizes verified GPT output to the requested texture resolution before producing the six-map ZIP
+- End-to-end OAuth test produced a real GPT-generated concrete albedo following the supplied UV cross
+- Official CLI bootstrap test installed the 297 MB x64 Windows binary and verified `Logged in using ChatGPT`
+
+## Previously fixed in v0.3.2-alpha
 
 This release fixes a real quick-reference selection exception found in the desktop log and makes ChatGPT browser-account readiness persistent without storing credentials.
 
