@@ -10,6 +10,18 @@ public static class ProjectStore
     public static ForgeProject Load(string path) { var p = JsonSerializer.Deserialize<ForgeProject>(File.ReadAllText(path), Options) ?? throw new InvalidDataException("Project file is empty."); if (p.FormatVersion > 1) throw new NotSupportedException("This project was made by a newer application version."); return p; }
 }
 
+public sealed record AppPreferences(bool ChatGptBrowserReady = false, DateTimeOffset? ConfirmedUtc = null);
+public static class AppPreferenceStore
+{
+    private static readonly JsonSerializerOptions Options = new() { WriteIndented = true };
+    public static AppPreferences Load(string path)
+    {
+        try { return File.Exists(path) ? JsonSerializer.Deserialize<AppPreferences>(File.ReadAllText(path), Options) ?? new() : new(); }
+        catch (JsonException) { return new(); }
+    }
+    public static void Save(AppPreferences preferences, string path) { Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(path))!); File.WriteAllText(path, JsonSerializer.Serialize(preferences, Options)); }
+}
+
 public static class TextureExporter
 {
     private static readonly Dictionary<MapKind, string> Names = new() { [MapKind.Diffuse] = "Diffuse", [MapKind.Albedo] = "Albedo", [MapKind.Roughness] = "Roughness", [MapKind.Normal] = "Normal", [MapKind.Height] = "Displacement", [MapKind.Metalness] = "Metalness", [MapKind.AmbientOcclusion] = "AO", [MapKind.Coverage] = "Coverage" };

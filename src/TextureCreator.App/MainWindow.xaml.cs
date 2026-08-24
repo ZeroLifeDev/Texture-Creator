@@ -14,13 +14,15 @@ namespace TextureCreator.App;
 
 public partial class MainWindow : Window
 {
-    private ForgeProject project = new(); private MeshData? mesh; private TextureSet? textures; private string? projectPath; private string? uvLayoutImagePath; private Point dragStart; private double yaw = 25, pitch = -15, distance = 4; private bool dragging;
+    private ForgeProject project = new(); private MeshData? mesh; private TextureSet? textures; private string? projectPath; private string? uvLayoutImagePath; private Point dragStart; private double yaw = 25, pitch = -15, distance = 4; private bool dragging; private bool synchronizingReferenceUi;
     private readonly string logPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "PBRReferenceForge", "logs", "app.log");
+    private readonly string preferencesPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "PBRReferenceForge", "preferences.json");
+    private AppPreferences preferences = new();
     public MainWindow()
     {
         InitializeComponent(); Directory.CreateDirectory(Path.GetDirectoryName(logPath)!); Log("Application started");
         MaterialCombo.ItemsSource = Enum.GetValues<MaterialKind>(); MaterialCombo.SelectedItem = MaterialKind.Dielectric; QuickMaterialCombo.ItemsSource = Enum.GetValues<MaterialKind>(); QuickMaterialCombo.SelectedItem = MaterialKind.Dielectric; RoleCombo.ItemsSource = Enum.GetValues<ReferenceRole>(); RoleCombo.SelectedItem = ReferenceRole.Custom;
-        AddLights(); Closing += (_, _) => { if (projectPath is not null) Try(() => ProjectStore.Save(project, projectPath + ".autosave")); };
+        preferences = AppPreferenceStore.Load(preferencesPath); UpdateAccountUi(); AddLights(); Closing += (_, _) => { if (projectPath is not null) Try(() => ProjectStore.Save(project, projectPath + ".autosave")); };
     }
     private void AddLights() { var group = new Model3DGroup(); group.Children.Add(new AmbientLight(Color.FromRgb(85, 90, 100))); group.Children.Add(new DirectionalLight(Color.FromRgb(245, 240, 225), new(-.7, -1, -1))); group.Children.Add(new DirectionalLight(Color.FromRgb(90, 130, 160), new(.7, .2, .4))); Viewport.Children.Add(new ModelVisual3D { Content = group }); }
 
@@ -32,7 +34,7 @@ public partial class MainWindow : Window
     private void QuickUvImage_Click(object sender, RoutedEventArgs e)
     {
         var d = new OpenFileDialog { Filter = "UV layout image|*.png;*.jpg;*.jpeg;*.webp" }; if (d.ShowDialog() != true) return;
-        Try(() => { var image = ImageIo.Load(d.FileName); uvLayoutImagePath = d.FileName; mesh = null; project.ModelPath = null; project.Name = Path.GetFileNameWithoutExtension(d.FileName); QuickModelLabel.Text = Path.GetFileName(d.FileName); QuickModelDetails.Text = $"UV layout image  •  {image.Width} × {image.Height}  •  island detection enabled"; QuickModelDetails.Foreground = new SolidColorBrush(Color.FromRgb(83, 203, 161)); ModelName.Text = "Image-only UV source"; MeshStats.Text = Path.GetFileName(d.FileName); UvImage.Source = ImageIo.ToBitmap(image); UvEmpty.Visibility = Visibility.Collapsed; QuickStatus.Text = "UV layout loaded — image-based projection mode"; Log($"Imported UV layout image {d.FileName}"); });
+        Try(() => LoadQuickUvLayout(d.FileName));
     }
     private void AddReference_Click(object sender, RoutedEventArgs e)
     {
@@ -42,11 +44,11 @@ public partial class MainWindow : Window
     private void QuickReference_Click(object sender, RoutedEventArgs e)
     {
         var d = new OpenFileDialog { Filter = "Texture reference|*.png;*.jpg;*.jpeg;*.webp" }; if (d.ShowDialog() != true) return;
-        Try(() => { _ = ImageIo.Load(d.FileName); project.References.Clear(); project.References.Add(new() { Path = d.FileName, Role = ReferenceRole.Front }); ReferenceList.Items.Clear(); ReferenceList.Items.Add($"{Path.GetFileName(d.FileName)}  [Front]"); ReferenceList.SelectedIndex = 0; QuickReferenceLabel.Text = Path.GetFileName(d.FileName); SetQuickReferencePreview(d.FileName); QuickStatus.Text = "Reference loaded — ready when the UV model is selected"; });
+        Try(() => LoadQuickReference(d.FileName));
     }
-    private void SetQuickReferencePreview(string path) { var bmp = new BitmapImage(); bmp.BeginInit(); bmp.CacheOption = BitmapCacheOption.OnLoad; bmp.UriSource = new(path); bmp.EndInit(); QuickReferencePreview.Source = bmp; }
-    private void ReferenceList_SelectionChanged(object sender, SelectionChangedEventArgs e) { if (ReferenceList.SelectedIndex < 0) return; RoleCombo.SelectedItem = project.References[ReferenceList.SelectedIndex].Role; Try(() => { var bmp = new BitmapImage(); bmp.BeginInit(); bmp.CacheOption = BitmapCacheOption.OnLoad; bmp.UriSource = new(project.References[ReferenceList.SelectedIndex].Path); bmp.EndInit(); ReferenceBackdrop.Source = bmp; }); }
-    private void RoleCombo_SelectionChanged(object sender, SelectionChangedEventArgs e) { if (ReferenceList is null || ReferenceList.SelectedIndex < 0 || RoleCombo.SelectedItem is not ReferenceRole role) return; project.References[ReferenceList.SelectedIndex].Role = role; ReferenceList.Items[ReferenceList.SelectedIndex] = $"{Path.GetFileName(project.References[ReferenceList.SelectedIndex].Path)}  [{role}]"; }
+    private void SetQuickReferencePreview(string path) { var bmp = new BitmapImage(); bmp.BeginInit(); bmp.CacheOption = BitmapCacheOption.OnLoad; bmp.UriSource = new(Path.GetFullPath(path), UriKind.Absolute); bmp.EndInit(); QuickReferencePreview.Source = bmp; }
+    private void ReferenceList_SelectionChanged(object sender, SelectionChangedEventArgs e) { if (synchronizingReferenceUi) return; var index = ReferenceList.SelectedIndex; if (index < 0 || index >= project.References.Count) return; synchronizingReferenceUi = true; try { RoleCombo.SelectedItem = project.References[index].Role; } finally { synchronizingReferenceUi = false; } Try(() => { var bmp = new BitmapImage(); bmp.BeginInit(); bmp.CacheOption = BitmapCacheOption.OnLoad; bmp.UriSource = new(Path.GetFullPath(project.References[index].Path), UriKind.Absolute); bmp.EndInit(); ReferenceBackdrop.Source = bmp; }); }
+    private void RoleCombo_SelectionChanged(object sender, SelectionChangedEventArgs e) { if (synchronizingReferenceUi || ReferenceList is null || ReferenceList.SelectedIndex < 0 || ReferenceList.SelectedIndex >= project.References.Count || RoleCombo.SelectedItem is not ReferenceRole role) return; var index = ReferenceList.SelectedIndex; project.References[index].Role = role; synchronizingReferenceUi = true; try { ReferenceList.Items[index] = $"{Path.GetFileName(project.References[index].Path)}  [{role}]"; ReferenceList.SelectedIndex = index; } finally { synchronizingReferenceUi = false; } }
     private void Open_Click(object sender, RoutedEventArgs e)
     {
         var d = new OpenFileDialog { Filter = "PBR Reference Forge Project|*.tforge" }; if (d.ShowDialog() != true) return;
@@ -84,11 +86,28 @@ public partial class MainWindow : Window
     }
     private async void WebAssist_Click(object sender, RoutedEventArgs e) { if (textures is null) { MessageBox.Show("Generate maps first so Web Assist has controlled input.", "Web Assist"); return; } if (MessageBox.Show("Web Assist sends files outside this computer only after you manually attach them in your browser. Continue preparing files?", "External processing disclosure", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes) return; var r = await new ChatGptWebAssistProvider().PrepareAsync(textures[MapKind.Albedo], textures.Maps.GetValueOrDefault(MapKind.Coverage), "clean lighting and repair only masked unseen regions", default); MessageBox.Show(r.Instructions, "Semi-automatic Web Assist", MessageBoxButton.OK, MessageBoxImage.Information); Process.Start(new ProcessStartInfo("https://chatgpt.com") { UseShellExecute = true }); }
     private void Logs_Click(object sender, RoutedEventArgs e) { Process.Start("explorer.exe", $"/select,\"{logPath}\""); }
-    private void About_Click(object sender, RoutedEventArgs e) => MessageBox.Show("PBR Reference Forge v0.3.0-alpha\n\nAccepts UV-mapped 3D models or UV layout images. Reconstruction is inferred and not physically measured.", "About");
-    private void ChatGptSignIn_Click(object sender, RoutedEventArgs e) { Process.Start(new ProcessStartInfo("https://chatgpt.com/") { UseShellExecute = true }); QuickStatus.Text = "ChatGPT opened in your browser — sign in or switch accounts there. This app cannot read your login."; }
+    private void About_Click(object sender, RoutedEventArgs e) => MessageBox.Show("PBR Reference Forge v0.3.2-alpha\n\nAccepts UV-mapped 3D models or UV layout images. Reconstruction is inferred and not physically measured.", "About");
+    private void ChatGptSignIn_Click(object sender, RoutedEventArgs e)
+    {
+        Process.Start(new ProcessStartInfo("https://chatgpt.com/") { UseShellExecute = true });
+        var confirmed = MessageBox.Show("ChatGPT opened in your normal browser. Sign in or switch accounts there, then return here.\n\nMark this browser account as ready for Web Assist?\n\nThe app saves only this readiness setting. Your browser keeps the actual login; the app never reads passwords, cookies, tokens, or account identity.", "Connect ChatGPT browser account", MessageBoxButton.YesNo, MessageBoxImage.Information) == MessageBoxResult.Yes;
+        if (!confirmed) { QuickStatus.Text = "Account connection not marked ready — try again anytime"; return; }
+        preferences = new AppPreferences(true, DateTimeOffset.UtcNow); AppPreferenceStore.Save(preferences, preferencesPath); UpdateAccountUi(); QuickStatus.Text = "ChatGPT browser account marked ready — this setting will persist"; Log("ChatGPT browser account marked ready (no credentials stored)");
+    }
     private void ShowAdvanced_Click(object sender, RoutedEventArgs e) { QuickWorkspace.Visibility = Visibility.Collapsed; }
     private void ShowQuick_Click(object sender, RoutedEventArgs e) { QuickWorkspace.Visibility = Visibility.Visible; }
     private void ReadSettings() { project.DefaultMaterial = (MaterialKind)(MaterialCombo.SelectedItem ?? MaterialKind.Dielectric); project.TextureResolution = int.Parse(((ComboBoxItem)ResolutionCombo.SelectedItem).Content.ToString()!); project.Roughness = (float)RoughnessSlider.Value; project.Metalness = (float)MetalSlider.Value; project.NormalStrength = (float)NormalSlider.Value; }
+
+    internal void LoadQuickUvLayout(string path)
+    {
+        var image = ImageIo.Load(path); uvLayoutImagePath = path; mesh = null; project.ModelPath = null; project.Name = Path.GetFileNameWithoutExtension(path); QuickModelLabel.Text = Path.GetFileName(path); QuickModelDetails.Text = $"UV layout image  •  {image.Width} × {image.Height}  •  island detection enabled"; QuickModelDetails.Foreground = new SolidColorBrush(Color.FromRgb(83, 203, 161)); ModelName.Text = "Image-only UV source"; MeshStats.Text = Path.GetFileName(path); UvImage.Source = ImageIo.ToBitmap(image); UvEmpty.Visibility = Visibility.Collapsed; QuickStatus.Text = "UV layout loaded — image-based projection mode"; Log($"Imported UV layout image {path}");
+    }
+    internal void LoadQuickReference(string path)
+    {
+        _ = ImageIo.Load(path); synchronizingReferenceUi = true; try { ReferenceList.SelectedIndex = -1; ReferenceList.Items.Clear(); project.References.Clear(); project.References.Add(new() { Path = path, Role = ReferenceRole.Front }); ReferenceList.Items.Add($"{Path.GetFileName(path)}  [Front]"); QuickReferenceLabel.Text = Path.GetFileName(path); SetQuickReferencePreview(path); RoleCombo.SelectedItem = ReferenceRole.Front; ReferenceList.SelectedIndex = 0; } finally { synchronizingReferenceUi = false; } QuickStatus.Text = "Reference loaded — ready to generate"; Log($"Imported quick reference {path}");
+    }
+    internal bool HasQuickReference => project.References.Count == 1 && ReferenceList.Items.Count == 1 && ReferenceList.SelectedIndex == 0;
+    private void UpdateAccountUi() { ChatGptAccountButton.Content = preferences.ChatGptBrowserReady ? "ChatGPT Browser Ready  ✓" : "Connect ChatGPT Browser Account"; }
 
     private void RenderMesh()
     {

@@ -5,7 +5,7 @@
     <UseWPF>true</UseWPF>
     <AssemblyName>PBRReferenceForge</AssemblyName>
     <RootNamespace>TextureCreator.App</RootNamespace>
-    <Version>0.3.1</Version>
+    <Version>0.3.2</Version>
   </PropertyGroup>
   <ItemGroup><ProjectReference Include="..\TextureCreator.Core\TextureCreator.Core.csproj" /></ItemGroup>
 </Project>

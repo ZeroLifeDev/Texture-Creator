@@ -1,4 +1,18 @@
-# PBR Reference Forge v0.3.1-alpha
+# PBR Reference Forge v0.3.2-alpha
+
+This release fixes a real quick-reference selection exception found in the desktop log and makes ChatGPT browser-account readiness persistent without storing credentials.
+
+## Fixed and verified in v0.3.2-alpha
+
+- Prevents reference-list selection events from indexing an empty backing collection
+- Makes quick reference replacement atomic and keeps the preview, list and project synchronized
+- Adds a packaged WPF UI smoke route that loads a UV image and reference and captures the resulting window
+- Replaces the misleading account chooser label with an explicit browser-account connection flow
+- Saves a local `ChatGptBrowserReady` confirmation across restarts while leaving authentication entirely in the browser
+- Never stores or reads passwords, cookies, tokens or ChatGPT account identity
+- Adds preference persistence, corrupt-file fallback and credential-absence tests
+
+## Previously fixed in v0.3.1-alpha
 
 This patch release replaces direct luminance displacement with a constrained, multi-scale relief estimator validated on detailed cracked concrete.
 

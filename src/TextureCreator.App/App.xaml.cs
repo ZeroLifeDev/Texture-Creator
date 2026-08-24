@@ -8,6 +8,10 @@ public partial class App : Application
     protected override void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
+        if (e.Args.Length == 5 && e.Args[0] == "--ui-smoke")
+        {
+            RunUiSmoke(e.Args); Shutdown(); return;
+        }
         if ((e.Args.Length is 4 or 5) && (e.Args[0] == "--quick-export" || e.Args[0] == "--quick-export-uv"))
         {
             RunQuickExport(e.Args); Shutdown(); return;
@@ -21,6 +25,19 @@ public partial class App : Application
             window.Close(); Shutdown(); return;
         }
         window.Show();
+    }
+
+    private static void RunUiSmoke(string[] args)
+    {
+        var statusPath = Path.GetFullPath(args[4]);
+        try
+        {
+            var window = new MainWindow { ShowInTaskbar = false }; window.Show(); window.LoadQuickUvLayout(args[1]); window.LoadQuickReference(args[2]); window.UpdateLayout();
+            if (!window.HasQuickReference) throw new InvalidOperationException("Quick reference selection did not remain synchronized.");
+            var width = Math.Max(1, (int)window.ActualWidth); var height = Math.Max(1, (int)window.ActualHeight); var bitmap = new RenderTargetBitmap(width, height, 96, 96, PixelFormats.Pbgra32); bitmap.Render(window); var encoder = new PngBitmapEncoder(); encoder.Frames.Add(BitmapFrame.Create(bitmap)); Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(args[3]))!); using (var stream = File.Create(args[3])) encoder.Save(stream);
+            File.WriteAllText(statusPath, "PASS: UV layout and reference loaded without a selection error."); window.Close(); Environment.ExitCode = 0;
+        }
+        catch (Exception ex) { Directory.CreateDirectory(Path.GetDirectoryName(statusPath)!); File.WriteAllText(statusPath, "FAIL: " + ex); Environment.ExitCode = 1; }
     }
 
     private static void RunQuickExport(string[] args)
