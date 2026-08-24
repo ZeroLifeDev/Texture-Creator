@@ -14,6 +14,22 @@ public sealed class PipelineTests
     [Fact] public void MalformedObjFails() { var p = TempFile(".obj"); File.WriteAllText(p, "this is not geometry"); Assert.Throws<InvalidDataException>(() => ModelImporter.Load(p)); }
     [Fact] public void ProjectRoundTrips() { var p = TempFile(".tforge"); var input = new ForgeProject { Name = "Test", TextureResolution = 4096, References = [new() { Path = "ref.png", Role = ReferenceRole.Front }] }; ProjectStore.Save(input, p); var output = ProjectStore.Load(p); Assert.Equal("Test", output.Name); Assert.Equal(4096, output.TextureResolution); Assert.Equal(ReferenceRole.Front, output.References[0].Role); }
     [Fact] public void PbrMapsAreConsistentDimensions() { var src = Pattern(32); var set = new PbrGenerator().Generate(src, MaterialKind.BareMetal, .3f, .8f, 1); Assert.Equal(8, set.Maps.Count); Assert.All(set.Maps.Values, x => { Assert.Equal(32, x.Width); Assert.Equal(32, x.Height); }); Assert.True(set[MapKind.Metalness].Pixels[0] > 200); Assert.Equal(set[MapKind.Albedo].Pixels, set[MapKind.Diffuse].Pixels); }
+    [Fact] public void HeightMapSuppressesLightingGradientAndRecessesDarkCracks()
+    {
+        var source = new ImageBuffer(128, 128);
+        for (var y = 0; y < 128; y++) for (var x = 0; x < 128; x++) { var p = source.Offset(x, y); var value = (byte)(95 + x / 3); if (Math.Abs(x - 64) <= 2) value = 28; source.Pixels[p] = source.Pixels[p + 1] = source.Pixels[p + 2] = value; source.Pixels[p + 3] = 255; }
+        var height = new PbrGenerator().Generate(source, MaterialKind.Dielectric, .7f, 0, 1)[MapKind.Height];
+        byte H(int x, int y) => height.Pixels[height.Offset(x, y)];
+        Assert.True(H(64, 64) + 12 < (H(48, 64) + H(80, 64)) / 2);
+        Assert.InRange(Math.Abs(H(24, 64) - H(104, 64)), 0, 12);
+        Assert.All(height.Pixels.Chunk(4), pixel => Assert.InRange(pixel[0], (byte)88, (byte)158));
+    }
+    [Fact] public void WebAssistPromptRequestsDepthFriendlyNeutralReference()
+    {
+        Assert.Contains("neutral diffuse lighting", ChatGptWebAssistProvider.MaterialReferencePrompt);
+        Assert.Contains("visually recessed", ChatGptWebAssistProvider.MaterialReferencePrompt);
+        Assert.Contains("do not turn them into raised ridges", ChatGptWebAssistProvider.MaterialReferencePrompt);
+    }
     [Fact] public void CoverageRasterizesUvTriangle() { var p = TempFile(".obj"); File.WriteAllText(p, "v 0 0 0\nv 1 0 0\nv 0 1 0\nvt 0 0\nvt 1 0\nvt 0 1\nf 1/1 2/2 3/3\n"); var c = UvServices.RasterizeUvCoverage(ModelImporter.Load(p), 32); Assert.Contains(c.Pixels.Chunk(4), px => px[3] == 255); }
     [Fact] public void UvSeamsAreDetected() { var p = TempFile(".obj"); File.WriteAllText(p, "v 0 0 0\nv 1 0 0\nv 0 1 0\nv 1 1 0\nvt 0 0\nvt .5 0\nvt 0 1\nvt .6 0\nvt 1 1\nvt .6 1\nf 1/1 2/2 3/3\nf 2/4 4/5 3/6\n"); Assert.Single(UvServices.FindSeams(ModelImporter.Load(p))); }
     [Fact] public void ExportWritesPngSet() { var set = new PbrGenerator().Generate(Pattern(8), MaterialKind.Wood, .6f, 0, 1); var dir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString()); var files = TextureExporter.Export(set, dir, "Cube"); Assert.Equal(8, files.Count); Assert.All(files, f => Assert.True(new FileInfo(f).Length > 20)); }

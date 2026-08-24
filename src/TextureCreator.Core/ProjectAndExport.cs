@@ -45,11 +45,12 @@ public sealed record ProviderResult(bool Completed, string Instructions, string?
 
 public sealed class ChatGptWebAssistProvider : IImageGenerationProvider
 {
+    public const string MaterialReferencePrompt = "Prepare this image as a physically plausible material reference for deterministic PBR reconstruction. Return one flat, orthographic, edge-to-edge surface image with uniform scale and neutral diffuse lighting. Preserve the material's real colors, cracks, pores, aggregate and wear, but remove cast shadows, specular glare, ambient-occlusion darkening, perspective and lens distortion. Dark cracks and cavities must remain visually recessed; do not turn them into raised ridges. Do not invent large shapes or sharpen fine grain into spikes. No cube, room, scene, objects, labels, borders, text or watermark. Do not output a normal, height or roughness map; output only the corrected material reference.";
     public string Name => "ChatGPT Web Assist (experimental)";
     public bool SendsDataExternally => true;
     public Task<ProviderResult> PrepareAsync(ImageBuffer image, ImageBuffer? mask, string operation, CancellationToken cancellationToken)
     {
         var dir = Path.Combine(Path.GetTempPath(), "TextureCreator", Guid.NewGuid().ToString("N")); Directory.CreateDirectory(dir); var input = Path.Combine(dir, "input.png"); ImageIo.SavePng(image, input); if (mask is not null) ImageIo.SavePng(mask, Path.Combine(dir, "mask.png"));
-        return Task.FromResult(new ProviderResult(false, $"Files were prepared in {dir}. Open https://chatgpt.com in your normal browser, sign in interactively, attach the files, and request: {operation}. Save the result, then import it into Texture Creator. No cookies, tokens, or private APIs are accessed."));
+        return Task.FromResult(new ProviderResult(false, $"Files were prepared in {dir}. Open https://chatgpt.com in your normal browser, sign in interactively, attach the files, and use this prompt:\n\n{MaterialReferencePrompt}\n\nRequested repair: {operation}.\n\nSave the result, then import it into Texture Creator. No cookies, tokens, or private APIs are accessed."));
     }
 }

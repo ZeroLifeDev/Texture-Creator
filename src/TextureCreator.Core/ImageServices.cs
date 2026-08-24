@@ -43,7 +43,7 @@ public sealed class PbrGenerator
     public TextureSet Generate(ImageBuffer source, MaterialKind material, float roughness, float metalness, float normalStrength, IProgress<double>? progress = null, CancellationToken ct = default)
     {
         var set = new TextureSet(); var albedo = CorrectAlbedo(source, ct); progress?.Report(.2);
-        var height = Luminance(albedo); progress?.Report(.35); ct.ThrowIfCancellationRequested();
+        var height = InferHeight(albedo, ct); progress?.Report(.35); ct.ThrowIfCancellationRequested();
         set.Maps[MapKind.Albedo] = albedo;
         set.Maps[MapKind.Diffuse] = albedo.Clone();
         set.Maps[MapKind.Height] = Grayscale(height, source.Width, source.Height);
@@ -63,6 +63,55 @@ public sealed class PbrGenerator
     }
     private static float MaterialRoughness(MaterialKind m, float requested) => m switch { MaterialKind.Fabric => Math.Max(.72f, requested), MaterialKind.Rubber => Math.Max(.66f, requested), MaterialKind.Glass => Math.Min(.16f, requested), MaterialKind.BareMetal => Math.Min(.42f, requested), MaterialKind.Skin => Math.Max(.42f, requested), _ => requested };
     private static float[] Luminance(ImageBuffer s) { var r = new float[s.Width * s.Height]; for (var i = 0; i < r.Length; i++) { var p = i * 4; r[i] = s.Pixels[p] * .2126f + s.Pixels[p + 1] * .7152f + s.Pixels[p + 2] * .0722f; } return r; }
+    private static float[] InferHeight(ImageBuffer source, CancellationToken ct)
+    {
+        var w = source.Width; var h = source.Height; var luminance = Luminance(source); var mask = new bool[w * h];
+        for (var i = 0; i < mask.Length; i++) mask[i] = source.Pixels[i * 4 + 3] > 8;
+        var scale = Math.Min(w, h);
+        var broad = MaskedBoxBlur(luminance, mask, w, h, Math.Max(4, scale / 80));
+        var structure = MaskedBoxBlur(luminance, mask, w, h, Math.Max(2, scale / 320));
+        var fine = MaskedBoxBlur(luminance, mask, w, h, Math.Max(1, scale / 1024));
+        var result = new float[luminance.Length];
+        for (var i = 0; i < result.Length; i++)
+        {
+            if ((i & 0x3ffff) == 0) ct.ThrowIfCancellationRequested();
+            if (!mask[i]) { result[i] = 128; continue; }
+            // Mid-grey is the neutral plane. Broad lighting gradients are removed, structural
+            // dark features recess, and high-frequency photographic noise is deliberately limited.
+            var macroRelief = Math.Clamp((structure[i] - broad[i]) * .72f, -30f, 24f);
+            var microRelief = Math.Clamp((fine[i] - structure[i]) * .16f, -5f, 5f);
+            result[i] = Math.Clamp(128f + macroRelief + microRelief, 88f, 158f);
+        }
+        return result;
+    }
+    private static float[] MaskedBoxBlur(float[] source, bool[] mask, int w, int h, int radius)
+    {
+        var horizontalSums = new float[source.Length]; var horizontalCounts = new int[source.Length];
+        for (var y = 0; y < h; y++)
+        {
+            float sum = 0; var count = 0;
+            for (var xx = 0; xx < Math.Min(w, radius); xx++) { var i = y * w + xx; if (mask[i]) { sum += source[i]; count++; } }
+            for (var x = 0; x < w; x++)
+            {
+                var add = y * w + Math.Min(w - 1, x + radius); if (mask[add]) { sum += source[add]; count++; }
+                var removeX = x - radius - 1; if (removeX >= 0) { var remove = y * w + removeX; if (mask[remove]) { sum -= source[remove]; count--; } }
+                var i = y * w + x; horizontalSums[i] = sum; horizontalCounts[i] = count;
+            }
+        }
+        var result = new float[source.Length];
+        for (var x = 0; x < w; x++)
+        {
+            float sum = 0; var count = 0;
+            for (var yy = 0; yy < Math.Min(h, radius); yy++) { var i = yy * w + x; sum += horizontalSums[i]; count += horizontalCounts[i]; }
+            for (var y = 0; y < h; y++)
+            {
+                var addY = Math.Min(h - 1, y + radius); var add = addY * w + x; sum += horizontalSums[add]; count += horizontalCounts[add];
+                var removeY = y - radius - 1; if (removeY >= 0) { var remove = removeY * w + x; sum -= horizontalSums[remove]; count -= horizontalCounts[remove]; }
+                var i = y * w + x; result[i] = count > 0 ? sum / count : 128;
+            }
+        }
+        return result;
+    }
     private static float[] BoxBlur(float[] s, int w, int h, int radius) { var r = new float[s.Length]; for (var y = 0; y < h; y++) for (var x = 0; x < w; x++) { float sum = 0; var n = 0; for (var yy = Math.Max(0, y - radius); yy <= Math.Min(h - 1, y + radius); yy += Math.Max(1, radius / 2)) for (var xx = Math.Max(0, x - radius); xx <= Math.Min(w - 1, x + radius); xx += Math.Max(1, radius / 2)) { sum += s[yy * w + xx]; n++; } r[y * w + x] = sum / n; } return r; }
     private static ImageBuffer Grayscale(float[] v, int w, int h) { var r = new ImageBuffer(w, h); for (var i = 0; i < v.Length; i++) { var b = (byte)Math.Clamp(v[i], 0, 255); r.Pixels[i * 4] = r.Pixels[i * 4 + 1] = r.Pixels[i * 4 + 2] = b; r.Pixels[i * 4 + 3] = 255; } return r; }
     private static ImageBuffer Constant(int w, int h, byte value) { var r = new ImageBuffer(w, h); for (var i = 0; i < w * h; i++) { r.Pixels[i * 4] = r.Pixels[i * 4 + 1] = r.Pixels[i * 4 + 2] = value; r.Pixels[i * 4 + 3] = 255; } return r; }

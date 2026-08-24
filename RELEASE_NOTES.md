@@ -1,8 +1,21 @@
-# PBR Reference Forge v0.3.0-alpha
+# PBR Reference Forge v0.3.1-alpha
+
+This patch release replaces direct luminance displacement with a constrained, multi-scale relief estimator validated on detailed cracked concrete.
+
+## Fixed and verified in v0.3.1-alpha
+
+- Removes broad illumination gradients before deriving height
+- Keeps dark cracks and cavities recessed instead of embossing them outward
+- Separates structural relief from capped micro-detail to prevent geometry spikes
+- Writes neutral mid-height outside observed UV islands
+- Adds a depth-friendly ChatGPT Web Assist prompt for flat, shadow-neutral material references
+- Adds regression tests for recessed cracks, gradient suppression and prompt requirements
+- Validated the generated 2K maps with real subdivided geometry displacement in Blender 5.0
+- Automated test suite: 16 passed, 0 failed
+
+## Previously added in v0.3.0-alpha
 
 This release adds UV layout images as a first-class alternative to 3D models and provides a safe browser-based ChatGPT account chooser.
-
-## New and verified in v0.3.0-alpha
 
 - New Quick Texture Export is now the default screen
 - UV Source card now accepts either a UV-mapped 3D model or a UV layout image
