@@ -1,17 +1,22 @@
-# PBR Reference Forge v0.4.0-alpha
+# PBR Reference Forge v0.4.1-alpha
 
-This release replaces the misleading browser-account/local-generation flow with real GPT image generation through Codex OAuth.
+This release fixes the incomplete Codex runtime shipped by v0.4.0-alpha.
 
-## New and verified in v0.4.0-alpha
+## Fixed and verified in v0.4.1-alpha
 
-- Downloads the official standalone OpenAI Codex CLI automatically when missing
+- Installs the version-matched official Codex CLI, code-mode host, command runner, and Windows sandbox helper from one OpenAI Codex release.
+- Detects and repairs an existing installation that has only `codex.exe`.
+- Never reports GPT as ready unless the image-generation runtime is complete and ChatGPT OAuth is active.
+- Adds a packaged real-image-generation smoke route used to verify the release EXE end to end.
+
+- Downloads the complete official OpenAI Codex Windows runtime automatically when missing or incomplete
 - Uses Codex `login` and the existing ChatGPT OAuth session; no API key required
 - Attaches both the UV layout and material reference to a real non-interactive Codex task
 - Requires Codex to invoke GPT image generation and save a verified PNG before PBR derivation
 - Disables silent local fallback: missing Codex, missing login or missing generated image stops export with a clear error
 - Resizes verified GPT output to the requested texture resolution before producing the six-map ZIP
 - End-to-end OAuth test produced a real GPT-generated concrete albedo following the supplied UV cross
-- Official CLI bootstrap test installed the 297 MB x64 Windows binary and verified `Logged in using ChatGPT`
+- Official runtime bootstrap installed all four current v0.150.0 x64 Windows components and verified `Logged in using ChatGPT`
 
 ## Previously fixed in v0.3.2-alpha
 
@@ -93,8 +98,9 @@ This release adds UV layout images as a first-class alternative to 3D models and
 ## Verification
 
 - Release build: 0 warnings, 0 errors
-- Automated tests: 14 passed, 0 failed
+- Automated tests: 21 passed, 0 failed
 - Quick ZIP test verifies the exact six output maps
 - UV layout closed-island detection/fill test passed
 - Image-only executable export produced and decoded all six requested maps
 - Standalone EXE clean-directory startup and responsiveness smoke test passed
+- Packaged EXE invoked GPT through Codex OAuth, wrote `gpt-albedo.png`, and decoded the output successfully

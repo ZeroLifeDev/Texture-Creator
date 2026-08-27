@@ -26,7 +26,7 @@
     <ProgressBar x:Name="QuickProgress" Height="5" Margin="160,18,160,0" Foreground="{StaticResource Accent}" Visibility="Collapsed"/>
     <TextBlock x:Name="QuickStatus" Text="Everything runs locally. Your model and reference stay on this computer." Foreground="#89919B" HorizontalAlignment="Center" Margin="0,12,0,0"/>
    </StackPanel></ScrollViewer>
-   <Border Grid.Row="2" Background="#15171A" BorderBrush="#292D33" BorderThickness="0,1,0,0"><DockPanel LastChildFill="False" Margin="14,8"><TextBlock Text="Real GPT generation through Codex OAuth  •  no API key" Foreground="#747C85"/><TextBlock DockPanel.Dock="Right" Text="v0.4.0-alpha" Foreground="#747C85"/></DockPanel></Border>
+   <Border Grid.Row="2" Background="#15171A" BorderBrush="#292D33" BorderThickness="0,1,0,0"><DockPanel LastChildFill="False" Margin="14,8"><TextBlock Text="Real GPT generation through Codex OAuth  •  no API key" Foreground="#747C85"/><TextBlock DockPanel.Dock="Right" Text="v0.4.1-alpha" Foreground="#747C85"/></DockPanel></Border>
   </Grid>
  </Grid>
 </Window>

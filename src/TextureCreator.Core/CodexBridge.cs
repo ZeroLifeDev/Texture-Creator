@@ -5,31 +5,61 @@ using System.Text.Json;
 
 namespace TextureCreator.Core;
 
-public sealed record CodexStatus(bool Installed, bool LoggedIn, string Detail);
+public sealed record CodexStatus(bool Installed, bool RuntimeComplete, bool LoggedIn, string Detail);
 
 public sealed class CodexBridge
 {
     public const string OfficialDownload = "https://github.com/openai/codex/releases/latest/download/codex-x86_64-pc-windows-msvc.exe.zip";
-    public string RuntimeDirectory { get; } = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "PBRReferenceForge", "codex-runtime");
+    public static readonly IReadOnlyDictionary<string, string> RequiredAssets = new Dictionary<string, string>
+    {
+        ["codex-x86_64-pc-windows-msvc.exe.zip"] = "codex.exe",
+        ["codex-code-mode-host-x86_64-pc-windows-msvc.exe.zip"] = "codex-code-mode-host.exe",
+        ["codex-command-runner-x86_64-pc-windows-msvc.exe.zip"] = "codex-command-runner.exe",
+        ["codex-windows-sandbox-setup-x86_64-pc-windows-msvc.exe.zip"] = "codex-windows-sandbox-setup.exe"
+    };
+    public string RuntimeDirectory { get; }
     public string ExecutablePath => Path.Combine(RuntimeDirectory, "codex.exe");
+
+    public CodexBridge(string? runtimeDirectory = null) => RuntimeDirectory = runtimeDirectory ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "PBRReferenceForge", "codex-runtime");
+
+    public bool HasCompleteRuntime() => RequiredAssets.Values.All(name => File.Exists(Path.Combine(RuntimeDirectory, name)));
 
     public async Task<CodexStatus> GetStatusAsync(CancellationToken ct = default)
     {
-        if (!File.Exists(ExecutablePath)) return new(false, false, "Codex CLI is not installed for PBR Reference Forge.");
+        if (!File.Exists(ExecutablePath)) return new(false, false, false, "Codex CLI is not installed for PBR Reference Forge.");
+        if (!HasCompleteRuntime()) return new(true, false, false, "Codex is installed but its GPT image runtime is incomplete. Click Set Up Codex + GPT to repair it.");
         var result = await RunAsync(["login", "status"], null, ct, TimeSpan.FromSeconds(20));
         var loggedIn = result.ExitCode == 0 && (result.Output + result.Error).Contains("Logged in using ChatGPT", StringComparison.OrdinalIgnoreCase);
-        return new(true, loggedIn, loggedIn ? "Codex is signed in using ChatGPT." : "Codex is installed but not signed in.");
+        return new(true, true, loggedIn, loggedIn ? "Codex and the GPT image runtime are ready." : "Codex is installed but not signed in.");
     }
 
     public async Task InstallAsync(IProgress<double>? progress = null, CancellationToken ct = default)
     {
-        Directory.CreateDirectory(RuntimeDirectory); var zip = Path.Combine(RuntimeDirectory, "codex-download.zip");
-        using var client = new HttpClient { Timeout = TimeSpan.FromMinutes(10) }; client.DefaultRequestHeaders.UserAgent.ParseAdd("PBR-Reference-Forge/0.4");
-        using var release = await client.GetAsync("https://api.github.com/repos/openai/codex/releases/latest", ct); release.EnsureSuccessStatusCode(); using var document = JsonDocument.Parse(await release.Content.ReadAsStreamAsync(ct)); var assetUrl = document.RootElement.GetProperty("assets").EnumerateArray().FirstOrDefault(x => x.GetProperty("name").GetString() == "codex-x86_64-pc-windows-msvc.exe.zip").GetProperty("browser_download_url").GetString() ?? OfficialDownload;
-        using var response = await client.GetAsync(assetUrl, HttpCompletionOption.ResponseHeadersRead, ct); response.EnsureSuccessStatusCode();
-        var total = response.Content.Headers.ContentLength; await using (var input = await response.Content.ReadAsStreamAsync(ct)) await using (var output = File.Create(zip)) { var buffer = new byte[1024 * 128]; long copied = 0; int read; while ((read = await input.ReadAsync(buffer, ct)) > 0) { await output.WriteAsync(buffer.AsMemory(0, read), ct); copied += read; if (total > 0) progress?.Report(copied / (double)total.Value); } }
-        var extract = Path.Combine(RuntimeDirectory, "extract"); if (Directory.Exists(extract)) Directory.Delete(extract, true); ZipFile.ExtractToDirectory(zip, extract); var found = Directory.GetFiles(extract, "codex*.exe", SearchOption.AllDirectories).Select(x => new FileInfo(x)).OrderByDescending(x => x.Length).FirstOrDefault()?.FullName ?? throw new InvalidDataException("Official Codex archive did not contain the Windows executable."); File.Copy(found, ExecutablePath, true); File.Delete(zip); Directory.Delete(extract, true);
+        Directory.CreateDirectory(RuntimeDirectory);
+        using var client = new HttpClient { Timeout = TimeSpan.FromMinutes(15) }; client.DefaultRequestHeaders.UserAgent.ParseAdd("PBR-Reference-Forge/0.4.1");
+        using var release = await client.GetAsync("https://api.github.com/repos/openai/codex/releases/latest", ct); release.EnsureSuccessStatusCode(); using var document = JsonDocument.Parse(await release.Content.ReadAsStreamAsync(ct));
+        var available = document.RootElement.GetProperty("assets").EnumerateArray().ToDictionary(x => x.GetProperty("name").GetString()!, x => x.GetProperty("browser_download_url").GetString()!);
+        var completed = 0;
+        foreach (var (assetName, installedName) in RequiredAssets)
+        {
+            if (!available.TryGetValue(assetName, out var assetUrl)) throw new InvalidDataException($"The official Codex release does not contain required component {assetName}.");
+            await InstallAssetAsync(client, assetUrl, assetName[..^4], installedName, new Progress<double>(value => progress?.Report((completed + value) / RequiredAssets.Count)), ct);
+            completed++;
+        }
+        if (!HasCompleteRuntime()) throw new InvalidOperationException("Codex GPT image runtime installation was incomplete.");
         var version = await RunAsync(["--version"], null, ct, TimeSpan.FromSeconds(20)); if (version.ExitCode != 0) throw new InvalidOperationException("Installed Codex CLI did not start: " + version.Error);
+    }
+
+    private async Task InstallAssetAsync(HttpClient client, string assetUrl, string archivedName, string installedName, IProgress<double> progress, CancellationToken ct)
+    {
+        var staging = Path.Combine(RuntimeDirectory, "install-" + Guid.NewGuid().ToString("N")); Directory.CreateDirectory(staging); var zip = Path.Combine(staging, "download.zip");
+        try
+        {
+            using var response = await client.GetAsync(assetUrl, HttpCompletionOption.ResponseHeadersRead, ct); response.EnsureSuccessStatusCode();
+            var total = response.Content.Headers.ContentLength; await using (var input = await response.Content.ReadAsStreamAsync(ct)) await using (var output = File.Create(zip)) { var buffer = new byte[1024 * 128]; long copied = 0; int read; while ((read = await input.ReadAsync(buffer, ct)) > 0) { await output.WriteAsync(buffer.AsMemory(0, read), ct); copied += read; if (total > 0) progress.Report(copied / (double)total.Value); } }
+            var extract = Path.Combine(staging, "extract"); ZipFile.ExtractToDirectory(zip, extract); var files = Directory.GetFiles(extract, "*.exe", SearchOption.AllDirectories); var found = files.FirstOrDefault(path => string.Equals(Path.GetFileName(path), archivedName, StringComparison.OrdinalIgnoreCase)) ?? files.FirstOrDefault(path => string.Equals(Path.GetFileName(path), installedName, StringComparison.OrdinalIgnoreCase)) ?? (files.Length == 1 ? files[0] : null) ?? throw new InvalidDataException($"Official Codex archive did not contain {archivedName}."); File.Copy(found, Path.Combine(RuntimeDirectory, installedName), true);
+        }
+        finally { if (Directory.Exists(staging)) Directory.Delete(staging, true); }
     }
 
     public async Task LoginAsync(CancellationToken ct = default)

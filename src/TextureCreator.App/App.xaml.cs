@@ -12,6 +12,10 @@ public partial class App : Application
         {
             RunCodexBootstrap(e.Args[1]); Shutdown(); return;
         }
+        if (e.Args.Length == 5 && e.Args[0] == "--codex-image-smoke")
+        {
+            RunCodexImageSmoke(e.Args); Shutdown(); return;
+        }
         if (e.Args.Length == 5 && e.Args[0] == "--ui-smoke")
         {
             RunUiSmoke(e.Args); Shutdown(); return;
@@ -33,8 +37,19 @@ public partial class App : Application
 
     private static void RunCodexBootstrap(string statusPath)
     {
-        try { var status = Task.Run(async () => { var bridge = new CodexBridge(); var current = await bridge.GetStatusAsync(); if (!current.Installed) { await bridge.InstallAsync(); current = await bridge.GetStatusAsync(); } return current; }).GetAwaiter().GetResult(); File.WriteAllText(Path.GetFullPath(statusPath), $"Installed={status.Installed}; LoggedIn={status.LoggedIn}; {status.Detail}"); Environment.ExitCode = status.Installed ? 0 : 1; }
+        try { var status = Task.Run(async () => { var bridge = new CodexBridge(); var current = await bridge.GetStatusAsync(); if (!current.Installed || !current.RuntimeComplete) { await bridge.InstallAsync(); current = await bridge.GetStatusAsync(); } return current; }).GetAwaiter().GetResult(); File.WriteAllText(Path.GetFullPath(statusPath), $"Installed={status.Installed}; RuntimeComplete={status.RuntimeComplete}; LoggedIn={status.LoggedIn}; {status.Detail}"); Environment.ExitCode = status.Installed && status.RuntimeComplete ? 0 : 1; }
         catch (Exception ex) { File.WriteAllText(Path.GetFullPath(statusPath), "FAIL: " + ex); Environment.ExitCode = 1; }
+    }
+
+    private static void RunCodexImageSmoke(string[] args)
+    {
+        var statusPath = Path.GetFullPath(args[4]);
+        try
+        {
+            var output = Task.Run(async () => { var bridge = new CodexBridge(); var status = await bridge.GetStatusAsync(); if (!status.RuntimeComplete || !status.LoggedIn) throw new InvalidOperationException(status.Detail); return await bridge.GenerateUvTextureAsync(args[1], args[2], Path.GetFullPath(args[3])); }).GetAwaiter().GetResult();
+            _ = ImageIo.Load(output); File.WriteAllText(statusPath, "PASS: real Codex OAuth GPT image generation created and verified " + output); Environment.ExitCode = 0;
+        }
+        catch (Exception ex) { Directory.CreateDirectory(Path.GetDirectoryName(statusPath)!); File.WriteAllText(statusPath, "FAIL: " + ex); Environment.ExitCode = 1; }
     }
 
     private static void RunUiSmoke(string[] args)
